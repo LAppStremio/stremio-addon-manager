@@ -47,7 +47,6 @@ function loadUserAddons() {
                 const isCinemetaInstalled = !!cinemetaAddon
                 console.log('Cinemeta installed:', isCinemetaInstalled)
                 if (isCinemetaInstalled) {
-                    console.log('Cinemeta manifest:', cinemetaAddon.manifest)
                     const catalogs = Array.isArray(cinemetaAddon.manifest?.catalogs) ? cinemetaAddon.manifest.catalogs : []
                     const hasCinemetaSearchMovie = catalogs.some((catalog) => catalog && catalog.id === 'cinemeta.search' && catalog.type === 'movie')
                     const hasCinemetaSearchSeries = catalogs.some((catalog) => catalog && catalog.id === 'cinemeta.search' && catalog.type === 'series')
@@ -123,6 +122,13 @@ function setAuthKey(authKey) {
     console.log('AuthKey set to: ', stremioAuthKey.value)
 }
 
+function onAuthSuccess(authKey) {
+    // Ensure our local state has the latest key, then auto-load addons
+    setAuthKey(authKey)
+    console.log('Authentication successful, auto-loading addons...')
+    loadUserAddons()
+}
+
 function openEditModal(idx) {
     isEditModalVisible.value = true;
     currentEditIdx.value = idx;
@@ -152,7 +158,7 @@ function saveManifestEdit(updatedManifest) {
         <h2>Configure</h2>
         <form onsubmit="return false;">
             <fieldset>
-                <Authentication :stremioAPIBase="stremioAPIBase" @auth-key="setAuthKey" />
+                <Authentication :stremioAPIBase="stremioAPIBase" @auth-key="setAuthKey" @auth-success="onAuthSuccess" />
             </fieldset>
             <fieldset id="form_step1">
                 <legend>Step 1: Load Addons</legend>

@@ -12,7 +12,7 @@ const authKey = ref('')
 const email = ref('')
 const password = ref('')
 const loginButtonText = ref('Login')
-const emits = defineEmits(['auth-key'])
+const emits = defineEmits(['auth-key', 'auth-success'])
 
 async function loginUserPassword() {
     try {
@@ -28,10 +28,13 @@ async function loginUserPassword() {
             })
         }).then((resp) => {
             resp.json().then((data) => {
-                console.log("Auth data:" + data)
-                authKey.value = data.result.authKey
+                console.log("Auth data:", data)
+                authKey.value = data.result?.authKey || ''
                 loginButtonText.value = 'Logged in'
                 emitAuthKey()
+                if (authKey.value) {
+                    emits('auth-success', authKey.value)
+                }
             })
         })
     } catch (err) {
