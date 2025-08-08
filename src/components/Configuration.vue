@@ -42,6 +42,16 @@ function loadUserAddons() {
                 return
             }
             addons.value = data.result.addons
+            try {
+                const cinemetaAddon = addons.value.find((addon) => addon && addon.manifest && addon.manifest.name === 'Cinemeta')
+                const isCinemetaInstalled = !!cinemetaAddon
+                console.log('Cinemeta installed:', isCinemetaInstalled)
+                if (isCinemetaInstalled) {
+                    console.log('Cinemeta manifest:', cinemetaAddon.manifest)
+                }
+            } catch (e) {
+                console.error('Error while checking for Cinemeta addon:', e)
+            }
         })
     }).catch((error) => {
         console.error('Error fetching user addons', error)
