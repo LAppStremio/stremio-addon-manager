@@ -58,6 +58,16 @@ function loadUserAddons() {
                         : []
                     const hasMetaResource = resources.includes('meta')
                     console.log('Cinemeta resources include "meta":', hasMetaResource)
+
+                    // Check that the Popular (top) movie and series catalogs include extra with name 'search'
+                    const topMovieCatalog = catalogs.find((catalog) => catalog && catalog.id === 'top' && catalog.type === 'movie')
+                    const topSeriesCatalog = catalogs.find((catalog) => catalog && catalog.id === 'top' && catalog.type === 'series')
+                    const topMovieHasSearchExtra = Array.isArray(topMovieCatalog?.extra)
+                        && topMovieCatalog.extra.some((extraEntry) => extraEntry && extraEntry.name === 'search')
+                    const topSeriesHasSearchExtra = Array.isArray(topSeriesCatalog?.extra)
+                        && topSeriesCatalog.extra.some((extraEntry) => extraEntry && extraEntry.name === 'search')
+                    console.log('Cinemeta top (movie) has extra "search":', topMovieHasSearchExtra)
+                    console.log('Cinemeta top (series) has extra "search":', topSeriesHasSearchExtra)
                 }
             } catch (e) {
                 console.error('Error while checking for Cinemeta addon:', e)
