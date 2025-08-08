@@ -48,6 +48,17 @@ function loadUserAddons() {
                 console.log('Cinemeta installed:', isCinemetaInstalled)
                 if (isCinemetaInstalled) {
                     console.log('Cinemeta manifest:', cinemetaAddon.manifest)
+                    const catalogs = Array.isArray(cinemetaAddon.manifest?.catalogs) ? cinemetaAddon.manifest.catalogs : []
+                    const hasCinemetaSearchMovie = catalogs.some((catalog) => catalog && catalog.id === 'cinemeta.search' && catalog.type === 'movie')
+                    const hasCinemetaSearchSeries = catalogs.some((catalog) => catalog && catalog.id === 'cinemeta.search' && catalog.type === 'series')
+                    console.log('Cinemeta search (movie) catalog present:', hasCinemetaSearchMovie)
+                    console.log('Cinemeta search (series) catalog present:', hasCinemetaSearchSeries)
+
+                    const resources = Array.isArray(cinemetaAddon.manifest?.resources)
+                        ? cinemetaAddon.manifest.resources
+                        : []
+                    const hasMetaResource = resources.includes('meta')
+                    console.log('Cinemeta resources include "meta":', hasMetaResource)
                 }
             } catch (e) {
                 console.error('Error while checking for Cinemeta addon:', e)
