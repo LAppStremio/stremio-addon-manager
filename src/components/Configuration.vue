@@ -663,7 +663,7 @@ function saveNewAddon(manifest) {
                 <span class="stats-label">Total Addons:</span>
                 <span class="stats-count">{{ addonsCount }}</span>
               </div>
-              <button
+           <!---   <button
                 type="button"
                 class="btn primary"
                 :disabled="isLocked"
@@ -671,8 +671,8 @@ function saveNewAddon(manifest) {
               >
                 <span>{{ isManageAddonVisible ? '📝' : '➕' }}</span>
                 <span>{{ isManageAddonVisible ? 'Hide Addon Editor' : 'Create New Addon' }}</span>
-              </button>
-            </div>
+              </button> !!WIP!!-->
+            </div> 
             
             <div class="current-addons-section" v-if="addonsCount > 0">
               <div class="section-divider"></div>
