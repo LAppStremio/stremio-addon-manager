@@ -819,6 +819,7 @@ function saveNewAddon(manifest) {
   padding: 14px 16px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, var(--panel), rgba(0, 0, 0, 0));
+  min-height: 56px;
 }
 .card-header h3 {
   margin: 0;
@@ -833,6 +834,8 @@ function saveNewAddon(manifest) {
   border: 1px solid var(--border);
   padding: 4px 8px;
   border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .step-indicator {
   width: 28px;
