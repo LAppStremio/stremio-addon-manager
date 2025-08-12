@@ -1,28 +1,25 @@
 <script setup>
 import './assets/main.css'
 import Header from './components/Header.vue'
-import DarkModeToggle from './components/DarkModeToggle.vue'
-import Summary from './components/Summary.vue'
 import Configuration from './components/Configuration.vue'
-import ThankYou from './components/ThankYou.vue'
 import FAQ from './components/FAQ.vue'
 import Footer from './components/Footer.vue'
 </script>
 
 <template>
-  <header>
-    <DarkModeToggle />
-    <Header addonName="Stremio Addon Manager"
-      addonSummary="Effortlessly manage the order of your Stremio addons without re-installing."
-      addonTagline="Including the default Cinemeta catalogs." addonLogo="logo.png" />
-  </header>
-  <main>
-    <Summary />
-    <Configuration />
-    <ThankYou />
-    <FAQ />
-  </main>
-  <footer>
-    <Footer />
-  </footer>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="container">
+      </div>
+      <Header addonName="Cinebye"
+        addonSummary="Effortlessly get rid of Cinemeta, as much as you decide to." addonLogo="logo.png" />
+    </header>
+    <main class="app-main">
+      <Configuration />
+      <FAQ />
+    </main>
+    <footer class="app-footer">
+      <Footer />
+    </footer>
+  </div>
 </template>

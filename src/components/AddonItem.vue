@@ -55,160 +55,154 @@
 </script>
 
 <template>
-  <div class="item">
-    <div class="col-8">
-      <div class="details">
-        <div class="logo_container">
-          <img :src="logoURL || defaultLogo" />
-        </div>
-        <span>{{ name }}</span>
-      </div>
+  <div class="addon-row theme-dark">
+    <div class="drag-handle" title="Drag to reorder">
+      <span class="drag-icon">⋮⋮</span>
     </div>
-    <div class="col">
-      <button class="button icon-only visit-url" title="Open addon configuration page in new window"
+    <div class="details">
+      <img class="logo" :src="logoURL || defaultLogo" />
+      <span class="name">{{ name }}</span>
+    </div>
+    <div class="actions">
+      <button class="btn icon" title="Open addon configuration page in new window"
         :disabled="!isConfigurable" @click="openAddonConfigurationPage">
-        <img src="https://icongr.am/feather/arrow-up-right.svg?size=12">
+        <span class="icon-text">↗</span>
       </button>
-      <button class="button icon-only copy-url" title="Copy addon manifest URL to clipboard"
+      <button class="btn icon" title="Copy addon manifest URL to clipboard"
         @click="copyManifestURLToClipboard">
-        <img src="https://icongr.am/feather/clipboard.svg?size=12">
+        <span class="icon-text">⧉</span>
       </button>
-      <button class="button icon-only edit-manifest" title="Edit manifest JSON" @click="openEditManifestModal">
-        <img src="https://icongr.am/feather/edit.svg?size=12">
+      <button class="btn icon" title="Edit manifest JSON" @click="openEditManifestModal">
+        <span class="icon-text">✎</span>
       </button>
-      <button class="button icon-only delete" title="Remove addon from list" :disabled="!isDeletable"
+      <button class="btn icon danger" title="Remove addon from list" :disabled="!isDeletable"
         @click="removeAddon">
-        <img src="https://icongr.am/feather/trash-2.svg?size=12">
+        <span class="icon-text">×</span>
       </button>
     </div>
-    <i class="uil uil-draggabledots"></i>
   </div>
 </template>
 
 <style scoped>
-.sortable-list .item {
-  list-style: none;
-  display: flex;
-  cursor: move;
+.addon-row.theme-dark {
+  --panel: #252526;
+  --border: #3c3c3c;
+  --text: #d4d4d4;
+  --muted: #9da0a6;
+}
+.addon-row.theme-dark {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  border-radius: 5px;
-  padding: 10px 13px;
-  margin-bottom: 11px;
-  border: 1px solid #ccc;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  gap: 12px;
+  padding: 12px 14px;
+  margin: 8px 0;
+  background: #2d2d30;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: all 200ms ease;
+  position: relative;
 }
 
-.dark .sortable-list .item {
-  border: 1px solid #434242;
+.addon-row.theme-dark:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
-.item .details {
+.drag-handle {
   display: flex;
   align-items: center;
-  flex: 1;
-}
-
-.item .details img {
-  height: 60px;
-  width: 60px;
-  pointer-events: none;
-  margin-right: 12px;
-  object-fit: contain;
-  object-position: center;
-  border-radius: 30%;
-  background-color: #262626;
-}
-
-.col {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
-  min-width: 200px;
-}
-
-.button {
-  border-radius: 4px;
-  cursor: pointer;
-  padding: 5px;
-  transition: background-color 0.3s;
-}
-
-.icon-only {
-  display: flex;
   justify-content: center;
-  align-items: center;
+  width: 24px;
+  height: 40px;
+  cursor: grab;
+  opacity: 0.6;
+  transition: opacity 200ms ease;
+  user-select: none;
+  touch-action: none;
 }
 
-.visit-url img,
-.copy-url img,
-.edit-manifest img,
-.delete img {
-  width: 20px;
-  height: 20px;
+.drag-handle:hover {
+  opacity: 1;
 }
 
-@media (max-width: 768px) {
-  .sortable-list .item {
-    flex-direction: column;
-    align-items: center;
-    padding: 10px;
-  }
+.drag-handle:active {
+  cursor: grabbing;
+}
 
-  .item .details {
-    margin-bottom: 10px;
-    text-align: center;
-  }
+.drag-icon {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  font-family: monospace;
+  letter-spacing: -2px;
+}
 
-  .item .details img {
-    margin-right: 12px;
-    margin-bottom: 8px;
+@media (hover: none) and (pointer: coarse) {
+  /* Mobile/touch devices */
+  .drag-handle {
+    opacity: 1;
+    width: 32px;
+    background: var(--panel);
+    border-radius: 6px;
+    border: 1px solid var(--border);
   }
+  
+  .drag-icon {
+    color: var(--text);
+    font-size: 16px;
+  }
+  
+  .addon-row.theme-dark:hover {
+    transform: none;
+    box-shadow: none;
+  }
+}
+.details { display: inline-flex; align-items: center; gap: 12px; min-width: 0; }
+.logo { width: 44px; height: 44px; border-radius: 10px; background: #1e1e1e; object-fit: contain; }
+.name { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .col {
-    flex-direction: row;
+.actions { display: inline-flex; gap: 8px; }
+.btn { 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  width: 34px; 
+  height: 34px; 
+  border-radius: 8px; 
+  border: 1px solid var(--border); 
+  background: #252526; 
+  color: var(--text); 
+  cursor: pointer; 
+  transition: all 120ms ease;
+  padding: 0;
+}
+.btn:hover { background: #303034; border-color: #4b4b4b; transform: translateY(-1px); }
+.btn.danger { background: #402326; border-color: #5a2d34; }
+.btn.danger:hover { background: #4a2a2e; border-color: #6a3d44; }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.icon-text { 
+  font-size: 16px; 
+  line-height: 1; 
+  user-select: none; 
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  text-align: center;
+  display: block;
+}
+
+@media (max-width: 600px) {
+  .addon-row.theme-dark { 
+    grid-template-columns: auto 1fr; 
     gap: 8px;
-    justify-content: center;
-    width: 100%;
-    margin-top: 10px;
   }
-
-  .button {
-    padding: 6px;
+  .actions { 
+    justify-content: flex-start; 
+    grid-column: 1 / -1;
+    margin-top: 8px;
+    padding-left: 36px;
   }
-
-  .uil-draggabledots {
-    position: absolute;
-    right: 10px;
-    bottom: 10px;
-  }
-}
-
-@media (max-width: 480px) {
-  .item .details {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-  }
-
-  .item .details img {
-    margin-bottom: 6px;
-  }
-
-  .col {
-    flex-direction: row;
-    gap: 4px;
-    justify-content: center;
-    width: 100%;
-  }
-
-  .button {
-    padding: 4px;
-  }
-
-  .uil-draggabledots {
-    display: none;
+  .details {
+    grid-column: 2;
   }
 }
 </style>
