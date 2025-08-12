@@ -17,7 +17,7 @@
           </p>
         </div>
         <div class="right">
-          <a class="btn-link" href="https://github.com/pancake3000/stremio-addon-manager" target="_blank" rel="noopener">Source Code</a>
+          <a class="btn-link" href="https://github.com/0xConstant1/stremio-addon-manager" target="_blank" rel="noopener">Source Code</a>
         </div>
       </div>
     </div>
