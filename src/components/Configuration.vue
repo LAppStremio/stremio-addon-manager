@@ -746,7 +746,7 @@ function resetCinemeta() {
                   <div class="option-sub">Stops Cinemeta results from appearing when you search.</div>
                 </div>
                 <label class="switch">
-                  <input type="checkbox" v-model="shouldRemoveSearchArtifacts" :disabled="isLocked" />
+                  <input type="checkbox" v-model="shouldRemoveSearchArtifacts" :disabled="isLocked || isSearchArtifactsPatched" />
                   <span class="slider"></span>
                 </label>
               </div>
@@ -760,7 +760,7 @@ function resetCinemeta() {
                   <div class="option-sub">Removes Popular, New, and Featured catalogs from your home screen.</div>
                 </div>
                 <label class="switch">
-                  <input type="checkbox" v-model="shouldRemoveStandardCatalogs" :disabled="isLocked" />
+                  <input type="checkbox" v-model="shouldRemoveStandardCatalogs" :disabled="isLocked || isStandardCatalogsPatched" />
                   <span class="slider"></span>
                 </label>
               </div>
@@ -774,7 +774,7 @@ function resetCinemeta() {
                   <div class="option-sub">Stops Cinemeta from providing metadata for your movies and series.</div>
                 </div>
                 <label class="switch">
-                  <input type="checkbox" v-model="shouldRemoveMetaResource" :disabled="isLocked" />
+                  <input type="checkbox" v-model="shouldRemoveMetaResource" :disabled="isLocked || isMetaResourcePatched" />
                   <span class="slider"></span>
                 </label>
               </div>
@@ -1407,6 +1407,16 @@ function resetCinemeta() {
 }
 .switch input:disabled + .slider:before {
   background: #a9a9a9;
+}
+
+/* Locked patch switches (applied patches) - show as enabled but locked */
+.switch input:disabled:checked + .slider {
+  background: linear-gradient(180deg, rgba(0, 122, 204, 0.7), rgba(14, 99, 156, 0.7));
+  border-color: rgba(0, 122, 204, 0.5);
+}
+.switch input:disabled:checked + .slider:before {
+  transform: translate(18px, -50%);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 /* Buttons */
