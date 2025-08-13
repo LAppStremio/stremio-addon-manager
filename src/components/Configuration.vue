@@ -681,7 +681,6 @@ function resetCinemeta() {
             isStandardCatalogsPatched.value = false;
             isMetaResourcePatched.value = false;
             
-            alert('Cinemeta has been successfully reset to its original state and synced to Stremio!');
             console.log('Cinemeta reset and sync completed successfully');
         })
         .catch((error) => {
