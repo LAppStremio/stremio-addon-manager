@@ -23,6 +23,11 @@ const shouldRemoveSearchArtifacts = ref(false)
 const shouldRemoveStandardCatalogs = ref(false)
 const shouldRemoveMetaResource = ref(false)
 
+// Patch status tracking
+const isSearchArtifactsPatched = ref(false)
+const isStandardCatalogsPatched = ref(false)
+const isMetaResourcePatched = ref(false)
+
 // Restore functionality state
 const backupFile = ref(null)
 const backupFileName = ref('')
@@ -180,6 +185,104 @@ function removeMeta() {
     return { removedMeta: true }
 }
 
+/**
+ * Detect if Cinemeta search artifacts have been removed
+ * Returns true if the search catalogs and extras are missing (patch applied)
+ */
+function detectSearchArtifactsPatched() {
+    const cinemetaIndex = addons.value.findIndex((addon) => addon && addon.manifest && addon.manifest.name === 'Cinemeta')
+    if (cinemetaIndex === -1) {
+        return false // No Cinemeta addon found
+    }
+
+    const manifest = addons.value[cinemetaIndex].manifest || {}
+    const catalogs = Array.isArray(manifest.catalogs) ? manifest.catalogs : []
+
+    // Check if search catalogs are missing
+    const hasSearchMovie = catalogs.some((c) => c && c.id === 'cinemeta.search' && c.type === 'movie')
+    const hasSearchSeries = catalogs.some((c) => c && c.id === 'cinemeta.search' && c.type === 'series')
+
+    // Check if 'search' extra is missing from top catalogs
+    const topMovie = catalogs.find((c) => c && c.id === 'top' && c.type === 'movie')
+    const topSeries = catalogs.find((c) => c && c.id === 'top' && c.type === 'series')
+    
+    const topMovieHasSearchExtra = topMovie && Array.isArray(topMovie.extra) && topMovie.extra.some((e) => e && e.name === 'search')
+    const topSeriesHasSearchExtra = topSeries && Array.isArray(topSeries.extra) && topSeries.extra.some((e) => e && e.name === 'search')
+
+    // Patch is applied if search catalogs are missing AND search extras are missing from top catalogs
+    return !hasSearchMovie && !hasSearchSeries && !topMovieHasSearchExtra && !topSeriesHasSearchExtra
+}
+
+/**
+ * Detect if Cinemeta standard catalogs have been removed
+ * Returns true if Popular, New, and Featured catalogs are missing (patch applied)
+ */
+function detectStandardCatalogsPatched() {
+    const cinemetaIndex = addons.value.findIndex((addon) => addon && addon.manifest && addon.manifest.name === 'Cinemeta')
+    if (cinemetaIndex === -1) {
+        return false // No Cinemeta addon found
+    }
+
+    const manifest = addons.value[cinemetaIndex].manifest || {}
+    const catalogs = Array.isArray(manifest.catalogs) ? manifest.catalogs : []
+
+    // Check if any of the standard catalogs exist
+    const hasPopularMovie = catalogs.some((c) => c && c.id === 'top' && c.type === 'movie')
+    const hasPopularSeries = catalogs.some((c) => c && c.id === 'top' && c.type === 'series')
+    const hasNewMovie = catalogs.some((c) => c && c.id === 'year' && c.type === 'movie')
+    const hasNewSeries = catalogs.some((c) => c && c.id === 'year' && c.type === 'series')
+    const hasFeaturedMovie = catalogs.some((c) => c && c.id === 'imdbRating' && c.type === 'movie')
+    const hasFeaturedSeries = catalogs.some((c) => c && c.id === 'imdbRating' && c.type === 'series')
+
+    // Patch is applied if ALL standard catalogs are missing
+    return !hasPopularMovie && !hasPopularSeries && !hasNewMovie && !hasNewSeries && !hasFeaturedMovie && !hasFeaturedSeries
+}
+
+/**
+ * Detect if Cinemeta meta resource has been removed
+ * Returns true if 'meta' is missing from resources (patch applied)
+ */
+function detectMetaResourcePatched() {
+    const cinemetaIndex = addons.value.findIndex((addon) => addon && addon.manifest && addon.manifest.name === 'Cinemeta')
+    if (cinemetaIndex === -1) {
+        return false // No Cinemeta addon found
+    }
+
+    const manifest = addons.value[cinemetaIndex].manifest || {}
+    const resources = Array.isArray(manifest.resources) ? manifest.resources : []
+    
+    // Patch is applied if 'meta' is not in resources
+    return !resources.includes('meta')
+}
+
+/**
+ * Check all patches and update the reactive state accordingly
+ */
+function detectAppliedPatches() {
+    if (!Array.isArray(addons.value) || addons.value.length === 0) {
+        return
+    }
+
+    try {
+        isSearchArtifactsPatched.value = detectSearchArtifactsPatched()
+        isStandardCatalogsPatched.value = detectStandardCatalogsPatched()
+        isMetaResourcePatched.value = detectMetaResourcePatched()
+
+        // Update toggles to reflect current state
+        shouldRemoveSearchArtifacts.value = isSearchArtifactsPatched.value
+        shouldRemoveStandardCatalogs.value = isStandardCatalogsPatched.value
+        shouldRemoveMetaResource.value = isMetaResourcePatched.value
+
+        console.log('Patch detection results:', {
+            searchArtifacts: isSearchArtifactsPatched.value,
+            standardCatalogs: isStandardCatalogsPatched.value,
+            metaResource: isMetaResourcePatched.value
+        })
+    } catch (e) {
+        console.error('Error detecting applied patches:', e)
+    }
+}
+
 function loadUserAddons() {
     const key = stremioAuthKey.value
     if (!key) {
@@ -208,6 +311,8 @@ function loadUserAddons() {
                 return
             }
             addons.value = data.result.addons
+            // Detect already applied patches and update toggles
+            detectAppliedPatches()
         })
     }).catch((error) => {
         console.error('Error fetching user addons', error)
@@ -445,7 +550,10 @@ function restoreFromBackup() {
                 alert(`Successfully restored ${backupFile.value.length} addons from ${backupFileName.value}!`);
                 
                 // Update local state with restored data
-                addons.value = JSON.parse(JSON.stringify(backupFile.value));
+                addons.value = JSON.parse(JSON.stringify(backupFile.value))
+                
+                // Detect already applied patches after restore
+                detectAppliedPatches();
                 
                 // Reset backup state after successful restore
                 backupFile.value = null;
@@ -551,7 +659,10 @@ function saveNewAddon(manifest) {
             <div class="option-list">
               <div class="option-row">
                 <div class="option-text">
-                  <div class="option-title">Remove Cinemeta Search</div>
+                  <div class="option-title">
+                    Remove Cinemeta Search
+                    <span v-if="isSearchArtifactsPatched" class="patch-applied-label">Patch applied</span>
+                  </div>
                   <div class="option-sub">Stops Cinemeta results from appearing when you search.</div>
                 </div>
                 <label class="switch">
@@ -562,7 +673,10 @@ function saveNewAddon(manifest) {
 
               <div class="option-row">
                 <div class="option-text">
-                  <div class="option-title">Remove Cinemeta Catalogs</div>
+                  <div class="option-title">
+                    Remove Cinemeta Catalogs
+                    <span v-if="isStandardCatalogsPatched" class="patch-applied-label">Patch applied</span>
+                  </div>
                   <div class="option-sub">Removes Popular, New, and Featured catalogs from your home screen.</div>
                 </div>
                 <label class="switch">
@@ -573,7 +687,10 @@ function saveNewAddon(manifest) {
 
               <div class="option-row">
                 <div class="option-text">
-                  <div class="option-title">Remove Cinemeta Metadata</div>
+                  <div class="option-title">
+                    Remove Cinemeta Metadata
+                    <span v-if="isMetaResourcePatched" class="patch-applied-label">Patch applied</span>
+                  </div>
                   <div class="option-sub">Stops Cinemeta from providing metadata for your movies and series.</div>
                 </div>
                 <label class="switch">
@@ -1067,6 +1184,53 @@ function saveNewAddon(manifest) {
 .option-title {
   font-size: 14.5px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.patch-applied-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 5px;
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Mobile optimizations for patch labels */
+@media (max-width: 768px) {
+  .option-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  
+  .patch-applied-label {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.1px;
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .patch-applied-label {
+    font-size: 10px;
+    padding: 3px 6px;
+    font-weight: 700;
+    background: rgba(74, 222, 128, 0.25);
+    border: 1px solid rgba(74, 222, 128, 0.4);
+  }
 }
 .option-sub {
   color: var(--muted);
