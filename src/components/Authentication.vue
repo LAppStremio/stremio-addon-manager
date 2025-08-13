@@ -14,37 +14,84 @@ const password = ref('')
 const loginButtonText = ref('Login')
 const emits = defineEmits(['auth-key', 'auth-success'])
 
-async function loginUserPassword() {
+async function login() {
+    const cleanAuthKey = authKey.value.replaceAll('"', '').trim()
+    const hasCredentials = email.value.trim() && password.value.trim()
+    const hasAuthKey = cleanAuthKey.length > 0
+    
+    if (!hasCredentials && !hasAuthKey) {
+        alert('Please provide either email/password or paste an AuthKey')
+        return
+    }
+    
     try {
-        fetch(`${props.stremioAPIBase}login`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                authKey: null,
-                email: email.value,
-                password: password.value,
+        loginButtonText.value = 'Logging in...'
+        
+        if (hasCredentials) {
+            // Use username/password login
+            fetch(`${props.stremioAPIBase}login`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    authKey: null,
+                    email: email.value,
+                    password: password.value,
+                })
+            }).then((resp) => {
+                resp.json().then((data) => {
+                    console.log("Auth data:", data)
+                    if (data.result?.authKey) {
+                        authKey.value = data.result.authKey
+                        loginButtonText.value = 'Logged in'
+                        emitAuthKey()
+                        emits('auth-success', authKey.value)
+                    } else {
+                        throw new Error('Invalid credentials')
+                    }
+                })
+            }).catch((error) => {
+                throw error
             })
-        }).then((resp) => {
-            resp.json().then((data) => {
-                console.log("Auth data:", data)
-                authKey.value = data.result?.authKey || ''
-                loginButtonText.value = 'Logged in'
-                emitAuthKey()
-                if (authKey.value) {
-                    emits('auth-success', authKey.value)
-                }
+        } else if (hasAuthKey) {
+            // Use direct authkey login - validate by making a test API call
+            fetch(`${props.stremioAPIBase}addonCollectionGet`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    type: 'AddonCollectionGet',
+                    authKey: cleanAuthKey,
+                    update: false,
+                })
+            }).then((resp) => {
+                resp.json().then((data) => {
+                    console.log("AuthKey validation:", data)
+                    if (data.result !== null && data.result !== undefined) {
+                        loginButtonText.value = 'Logged in'
+                        authKey.value = cleanAuthKey
+                        emitAuthKey()
+                        emits('auth-success', cleanAuthKey)
+                    } else {
+                        throw new Error('Invalid AuthKey')
+                    }
+                })
+            }).catch((error) => {
+                throw error
             })
-        })
+        }
     } catch (err) {
         console.error(err);
-        alert('Login failed: ' + err.message);
+        alert('Login failed: ' + (err.message || 'Unknown error'));
+        loginButtonText.value = 'Login'
     }
 }
 
 function emitAuthKey() {
-    emits('auth-key', authKey.value.replaceAll('"', '').trim())
+    const cleanAuthKey = authKey.value.replaceAll('"', '').trim()
+    emits('auth-key', cleanAuthKey)
 }
 
 </script>
@@ -54,7 +101,7 @@ function emitAuthKey() {
     <div class="field-row login-row">
       <input class="input" type="text" v-model="email" placeholder="Stremio E-mail" autocomplete="username">
       <input class="input" type="password" v-model="password" placeholder="Stremio Password" autocomplete="current-password">
-      <button class="btn accent" @click="loginUserPassword">Login</button>
+      <button class="btn accent" @click="login" :disabled="loginButtonText === 'Logging in...'">{{ loginButtonText }}</button>
     </div>
     <div class="divider"><span>OR</span></div>
     <div class="field-row authkey-row">
@@ -121,4 +168,10 @@ function emitAuthKey() {
 .login-row .btn { width: 100%; }
 @media (min-width: 640px) { .login-row .btn { width: auto; justify-self: start; } }
 .btn.accent { background: linear-gradient(180deg, var(--accent), var(--accent-2)); border-color: transparent; color: #fff; }
+.auth-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 8px 0 0 0;
+  text-align: center;
+}
 </style>
