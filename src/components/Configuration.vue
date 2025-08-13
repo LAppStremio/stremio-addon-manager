@@ -44,6 +44,9 @@ const newAddonManifest = ref({
     catalogs: []
 })
 
+// Reset Cinemeta state
+const isResettingCinemeta = ref(false)
+
 const addonsCount = computed(() => Array.isArray(addons.value) ? addons.value.length : 0)
 
 /**
@@ -612,6 +615,70 @@ function saveNewAddon(manifest) {
         alert('Failed to create new addon');
     }
 }
+
+/**
+ * Reset Cinemeta addon to its original state by fetching the unmodified manifest
+ * from the official source and overwriting the current one, then syncing to Stremio
+ */
+function resetCinemeta() {
+    const key = stremioAuthKey.value;
+    if (!key) {
+        console.error('No auth key provided');
+        alert('Authentication required to reset Cinemeta');
+        return;
+    }
+
+    // Find the Cinemeta addon in the current collection
+    const cinemetaIndex = addons.value.findIndex((addon) => addon && addon.manifest && addon.manifest.name === 'Cinemeta');
+    if (cinemetaIndex === -1) {
+        alert('Cinemeta addon not found in your collection');
+        return;
+    }
+
+    console.log('Resetting Cinemeta to original state...');
+    isResettingCinemeta.value = true;
+
+    // Fetch the original Cinemeta manifest
+    fetch('https://v3-cinemeta.strem.io/manifest.json')
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch Cinemeta manifest: ${response.status} ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then((originalManifest) => {
+            console.log('Fetched original Cinemeta manifest:', originalManifest);
+            
+            // Preserve the original addon structure but replace the manifest
+            const originalAddon = addons.value[cinemetaIndex];
+            addons.value[cinemetaIndex] = {
+                ...originalAddon,
+                manifest: originalManifest
+            };
+
+            console.log('Cinemeta addon updated with original manifest');
+
+            // Auto-sync the updated collection to Stremio
+            return syncUserAddons();
+        })
+        .then(() => {
+            isSearchArtifactsPatched.value = false;
+            isStandardCatalogsPatched.value = false;
+            isMetaResourcePatched.value = false;
+            shouldRemoveSearchArtifacts.value = false;
+            shouldRemoveStandardCatalogs.value = false;
+            shouldRemoveMetaResource.value = false;
+            
+            console.log('Cinemeta reset and sync completed successfully');
+        })
+        .catch((error) => {
+            console.error('Error resetting Cinemeta:', error);
+            alert(`Failed to reset Cinemeta: ${error.message}`);
+        })
+        .finally(() => {
+            isResettingCinemeta.value = false;
+        });
+}
  </script>
 
 <template>
@@ -698,6 +765,23 @@ function saveNewAddon(manifest) {
                   <span class="slider"></span>
                 </label>
               </div>
+            </div>
+            
+            <div class="section-divider"></div>
+            
+            <div class="reset-section">
+              <p class="card-desc">Reset Cinemeta to its original state, removing all applied patches and restoring default functionality.</p>
+              <button
+                type="button"
+                class="btn primary reset-btn"
+                :disabled="isLocked || isResettingCinemeta || addonsCount === 0"
+                :aria-busy="isResettingCinemeta"
+                @click="resetCinemeta"
+              >
+                <span class="spinner" v-if="isResettingCinemeta"></span>
+                <span>🔄</span>
+                <span>Reset Cinemeta</span>
+              </button>
             </div>
           </div>
         </section>
@@ -1015,6 +1099,20 @@ function saveNewAddon(manifest) {
 
 .backup-section .card-desc {
   margin-bottom: 14px;
+}
+
+/* Reset section */
+.reset-section {
+  margin-top: 16px;
+}
+
+.reset-section .card-desc {
+  margin-bottom: 14px;
+}
+
+.reset-section .reset-btn {
+  width: 100%;
+  justify-content: center;
 }
 
 .section-divider {
