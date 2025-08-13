@@ -370,6 +370,15 @@ function syncUserAddons() {
                 alert("Failed to sync addons: " + data.result.error)
             } else {
                 console.log("Sync complete: + ", data)
+                
+                // Update patch status flags to match successfully synced toggle states
+                isSearchArtifactsPatched.value = shouldRemoveSearchArtifacts.value
+                isStandardCatalogsPatched.value = shouldRemoveStandardCatalogs.value
+                isMetaResourcePatched.value = shouldRemoveMetaResource.value
+                
+                // Run detection to verify patches were applied correctly (extra validation)
+                detectAppliedPatches()
+                
                 alert('Sync complete!')
             }
         })
