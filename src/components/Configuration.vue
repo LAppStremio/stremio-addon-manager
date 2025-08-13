@@ -658,17 +658,21 @@ function resetCinemeta() {
 
             console.log('Cinemeta addon updated with original manifest');
 
-            // Auto-sync the updated collection to Stremio
-            return syncUserAddons();
-        })
-        .then(() => {
-            isSearchArtifactsPatched.value = false;
-            isStandardCatalogsPatched.value = false;
-            isMetaResourcePatched.value = false;
+            // Reset toggles
             shouldRemoveSearchArtifacts.value = false;
             shouldRemoveStandardCatalogs.value = false;
             shouldRemoveMetaResource.value = false;
+
+            // Auto-sync the updated collection to Stremio (now with toggles disabled)
+            return syncUserAddons();
+        })
+        .then(() => {
+            // Update patch detection flags after successful sync
+            isSearchArtifactsPatched.value = false;
+            isStandardCatalogsPatched.value = false;
+            isMetaResourcePatched.value = false;
             
+            alert('Cinemeta has been successfully reset to its original state and synced to Stremio!');
             console.log('Cinemeta reset and sync completed successfully');
         })
         .catch((error) => {
