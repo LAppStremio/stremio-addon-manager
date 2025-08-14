@@ -109,6 +109,12 @@ function removeCinemetaSearchArtifacts() {
  * - Popular => id 'top' for movie and series
  * - New => id 'year' for movie and series
  * - Featured => id 'imdbRating' for movie and series
+ * 
+ * Conditional behavior:
+ * - If both 'Remove Cinemeta Search' AND 'Remove Cinemeta Catalogs' are ON: remove all catalogs
+ * - If only 'Remove Cinemeta Catalogs' is ON but 'Remove Cinemeta Search' is OFF: 
+ *   modify Popular catalogs (add isRequired: true to search extra) and remove others
+ * 
  * Returns a summary of which targets were removed.
  */
 function removeCinemetaStandardCatalogs() {
@@ -141,14 +147,55 @@ function removeCinemetaStandardCatalogs() {
     const hadFeaturedMovie = originalCatalogs.some(isFeaturedMovie)
     const hadFeaturedSeries = originalCatalogs.some(isFeaturedSeries)
 
-    const updatedCatalogs = originalCatalogs.filter((c) => !(
-        isPopularMovie(c) ||
-        isPopularSeries(c) ||
-        isNewMovie(c) ||
-        isNewSeries(c) ||
-        isFeaturedMovie(c) ||
-        isFeaturedSeries(c)
-    ))
+    // Check conditional behavior: if Remove Cinemeta Catalogs is ON but Remove Cinemeta Search is OFF
+    const shouldModifyPopularInsteadOfRemove = shouldRemoveStandardCatalogs.value && !shouldRemoveSearchArtifacts.value
+
+    let updatedCatalogs
+    let actuallyRemovedPopularMovie = false
+    let actuallyRemovedPopularSeries = false
+
+    if (shouldModifyPopularInsteadOfRemove) {
+        // Modify Popular catalogs (add isRequired: true to search extra) and remove others
+        updatedCatalogs = originalCatalogs.map((catalog) => {
+            if (isPopularMovie(catalog) || isPopularSeries(catalog)) {
+                // Modify the search extra to add isRequired: true
+                const modifiedCatalog = { ...catalog }
+                if (Array.isArray(modifiedCatalog.extra)) {
+                    modifiedCatalog.extra = modifiedCatalog.extra.map((extra) => {
+                        if (extra && extra.name === 'search') {
+                            return { ...extra, isRequired: true }
+                        }
+                        return extra
+                    })
+                }
+                return modifiedCatalog
+            }
+            return catalog
+        }).filter((c) => !(
+            // Still remove New and Featured catalogs completely
+            isNewMovie(c) ||
+            isNewSeries(c) ||
+            isFeaturedMovie(c) ||
+            isFeaturedSeries(c)
+        ))
+        
+        // Popular catalogs are modified, not removed
+        actuallyRemovedPopularMovie = false
+        actuallyRemovedPopularSeries = false
+    } else {
+        // Original behavior - remove all standard catalogs including Popular ones
+        updatedCatalogs = originalCatalogs.filter((c) => !(
+            isPopularMovie(c) ||
+            isPopularSeries(c) ||
+            isNewMovie(c) ||
+            isNewSeries(c) ||
+            isFeaturedMovie(c) ||
+            isFeaturedSeries(c)
+        ))
+        
+        actuallyRemovedPopularMovie = hadPopularMovie
+        actuallyRemovedPopularSeries = hadPopularSeries
+    }
 
     addons.value[cinemetaIndex].manifest = {
         ...manifest,
@@ -156,8 +203,8 @@ function removeCinemetaStandardCatalogs() {
     }
 
     return {
-        removedPopularMovie: hadPopularMovie,
-        removedPopularSeries: hadPopularSeries,
+        removedPopularMovie: actuallyRemovedPopularMovie,
+        removedPopularSeries: actuallyRemovedPopularSeries,
         removedNewMovie: hadNewMovie,
         removedNewSeries: hadNewSeries,
         removedFeaturedMovie: hadFeaturedMovie,
@@ -217,8 +264,11 @@ function detectSearchArtifactsPatched() {
 }
 
 /**
- * Detect if Cinemeta standard catalogs have been removed
- * Returns true if Popular, New, and Featured catalogs are missing (patch applied)
+ * Detect if Cinemeta standard catalogs have been removed or modified
+ * Returns true if:
+ * - All standard catalogs are missing (both toggles ON), OR
+ * - Popular catalogs are modified (search extra has isRequired: true) and New/Featured are removed
+ *   (only 'Remove Cinemeta Catalogs' ON but 'Remove Cinemeta Search' OFF)
  */
 function detectStandardCatalogsPatched() {
     const cinemetaIndex = addons.value.findIndex((addon) => addon && addon.manifest && addon.manifest.name === 'Cinemeta')
@@ -229,7 +279,7 @@ function detectStandardCatalogsPatched() {
     const manifest = addons.value[cinemetaIndex].manifest || {}
     const catalogs = Array.isArray(manifest.catalogs) ? manifest.catalogs : []
 
-    // Check if any of the standard catalogs exist
+    // Check if standard catalogs exist
     const hasPopularMovie = catalogs.some((c) => c && c.id === 'top' && c.type === 'movie')
     const hasPopularSeries = catalogs.some((c) => c && c.id === 'top' && c.type === 'series')
     const hasNewMovie = catalogs.some((c) => c && c.id === 'year' && c.type === 'movie')
@@ -237,8 +287,26 @@ function detectStandardCatalogsPatched() {
     const hasFeaturedMovie = catalogs.some((c) => c && c.id === 'imdbRating' && c.type === 'movie')
     const hasFeaturedSeries = catalogs.some((c) => c && c.id === 'imdbRating' && c.type === 'series')
 
-    // Patch is applied if ALL standard catalogs are missing
-    return !hasPopularMovie && !hasPopularSeries && !hasNewMovie && !hasNewSeries && !hasFeaturedMovie && !hasFeaturedSeries
+    // Check if Popular catalogs have been modified (search extra has isRequired: true)
+    const popularMovieCatalog = catalogs.find((c) => c && c.id === 'top' && c.type === 'movie')
+    const popularSeriesCatalog = catalogs.find((c) => c && c.id === 'top' && c.type === 'series')
+    
+    const isPopularMovieModified = popularMovieCatalog && Array.isArray(popularMovieCatalog.extra) && 
+        popularMovieCatalog.extra.some((e) => e && e.name === 'search' && e.isRequired === true)
+    const isPopularSeriesModified = popularSeriesCatalog && Array.isArray(popularSeriesCatalog.extra) && 
+        popularSeriesCatalog.extra.some((e) => e && e.name === 'search' && e.isRequired === true)
+
+    // Scenario 1: All standard catalogs are removed (both toggles ON)
+    const allCatalogsRemoved = !hasPopularMovie && !hasPopularSeries && !hasNewMovie && !hasNewSeries && !hasFeaturedMovie && !hasFeaturedSeries
+
+    // Scenario 2: Popular catalogs are modified and New/Featured are removed (only 'Remove Cinemeta Catalogs' ON)
+    const popularModifiedAndOthersRemoved = 
+        hasPopularMovie && hasPopularSeries && 
+        isPopularMovieModified && isPopularSeriesModified &&
+        !hasNewMovie && !hasNewSeries && !hasFeaturedMovie && !hasFeaturedSeries
+
+    // Patch is applied if either scenario is true
+    return allCatalogsRemoved || popularModifiedAndOthersRemoved
 }
 
 /**
