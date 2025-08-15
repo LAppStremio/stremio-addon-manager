@@ -25,10 +25,20 @@
       type: Boolean,
       required: false,
       default: false
+    },
+    isResetting: {
+      type: Boolean,
+      required: false,
+      default: false
+    },
+    isResetable: {
+      type: Boolean,
+      required: false,
+      default: true
     }
   })
   
-  const emits = defineEmits(['delete-addon', 'edit-manifest'])
+  const emits = defineEmits(['delete-addon', 'edit-manifest', 'reset-addon'])
   
   const defaultLogo = 'https://icongr.am/feather/box.svg?size=48&color=ffffff'
   
@@ -52,6 +62,10 @@
   function openEditManifestModal() {
     emits('edit-manifest', props.idx)
   }
+  
+  function resetAddon() {
+    emits('reset-addon', props.idx)
+  }
 </script>
 
 <template>
@@ -74,6 +88,12 @@
       </button>
       <button class="btn icon" title="Edit manifest JSON" @click="openEditManifestModal">
         <span class="icon-text">✎</span>
+      </button>
+      <button class="btn icon reset" title="Re-install addon" 
+        :disabled="!isResetable || isResetting || !manifestURL || manifestURL === 'N/A'"
+        @click="resetAddon">
+        <span class="spinner" v-if="isResetting"></span>
+        <span class="icon-text" v-else>⟲</span>
       </button>
       <button class="btn icon danger" title="Remove addon from list" :disabled="!isDeletable"
         @click="removeAddon">
@@ -180,6 +200,8 @@
 .btn:hover { background: #303034; border-color: #4b4b4b; transform: translateY(-1px); }
 .btn.danger { background: #402326; border-color: #5a2d34; }
 .btn.danger:hover { background: #4a2a2e; border-color: #6a3d44; }
+.btn.reset { background: #2a3340; border-color: #3d4b5a; }
+.btn.reset:hover { background: #334050; border-color: #4d5b6a; }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 .icon-text { 
   font-size: 16px; 
@@ -188,6 +210,22 @@
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   text-align: center;
   display: block;
+}
+
+/* Spinner */
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-top-color: rgba(255, 255, 255, 0.95);
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 600px) {

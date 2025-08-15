@@ -47,6 +47,9 @@ const newAddonManifest = ref({
 // Reset Cinemeta state
 const isResettingCinemeta = ref(false)
 
+// Generic addon reset state
+const isResettingAddon = ref({})
+
 const addonsCount = computed(() => Array.isArray(addons.value) ? addons.value.length : 0)
 
 /**
@@ -694,6 +697,226 @@ function saveNewAddon(manifest) {
 }
 
 /**
+ * Normalizes a manifest URL to ensure it's a valid HTTPS manifest.json endpoint
+ * Based on Go implementation with enhancements for JavaScript
+ * 
+ * Handles:
+ * - stremio:// to https:// scheme conversion
+ * - /configure to /manifest.json path conversion  
+ * - Appending /manifest.json if missing
+ * - Cleaning query parameters and fragments
+ * - URL validation and error handling
+ * 
+ * @param {string} manifestUrl - The URL to normalize
+ * @returns {string} - The normalized manifest.json URL
+ * @throws {Error} - If URL is invalid or uses unsupported protocol
+ */
+function normalizeManifestUrl(manifestUrl) {
+    try {
+        // Handle stremio:// scheme by converting to https://
+        if (manifestUrl.startsWith('stremio://')) {
+            manifestUrl = manifestUrl.replace('stremio://', 'https://');
+        }
+        
+        // Parse the URL for proper manipulation
+        const url = new URL(manifestUrl);
+        
+        // Convert any remaining stremio scheme to https
+        if (url.protocol === 'stremio:') {
+            url.protocol = 'https:';
+        }
+        
+        // Ensure we have a valid HTTP/HTTPS protocol
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+            throw new Error(`Unsupported protocol: ${url.protocol}. Only http:// and https:// are supported.`);
+        }
+        
+        // Validate hostname is not empty
+        if (!url.hostname) {
+            throw new Error('Invalid URL: missing hostname');
+        }
+        
+        // Handle /configure paths by replacing with /manifest.json
+        if (url.pathname.endsWith('/configure')) {
+            url.pathname = url.pathname.replace(/\/configure$/, '/manifest.json');
+        }
+        // Handle /configure/ paths
+        else if (url.pathname.endsWith('/configure/')) {
+            url.pathname = url.pathname.replace(/\/configure\/$/, '/manifest.json');
+        }
+        // If path doesn't end with manifest.json, append it
+        else if (!url.pathname.endsWith('/manifest.json')) {
+            // Ensure proper path separator
+            url.pathname = url.pathname.endsWith('/') 
+                ? url.pathname + 'manifest.json' 
+                : url.pathname + '/manifest.json';
+        }
+        
+        // Clear query parameters and fragments for manifest.json URLs
+        // (they're not typically needed for manifest fetching)
+        url.search = '';
+        url.hash = '';
+        
+        return url.toString();
+    } catch (error) {
+        // If URL parsing fails, fall back to string manipulation
+        console.warn(`Failed to parse URL "${manifestUrl}", falling back to string manipulation:`, error);
+        
+        let normalizedUrl = manifestUrl;
+        
+        // Handle stremio:// scheme conversion
+        if (normalizedUrl.startsWith('stremio://')) {
+            normalizedUrl = normalizedUrl.replace('stremio://', 'https://');
+        }
+        
+        // Handle /configure paths
+        if (normalizedUrl.includes('/configure')) {
+            normalizedUrl = normalizedUrl.replace(/\/configure\/?$/, '/manifest.json');
+        }
+        // Ensure manifest.json ending
+        else if (!normalizedUrl.endsWith('/manifest.json')) {
+            normalizedUrl = normalizedUrl.endsWith('/') 
+                ? normalizedUrl + 'manifest.json' 
+                : normalizedUrl + '/manifest.json';
+        }
+        
+        // Clean up query parameters and fragments from fallback URL
+        normalizedUrl = normalizedUrl.split('?')[0].split('#')[0];
+        
+        return normalizedUrl;
+    }
+}
+
+/**
+ * Shared validation helper for addon reset operations
+ * Validates the fetched manifest and current addon state before applying changes
+ */
+function validateAddonResetSafety(expectedAddon, fetchedManifest, currentIndex, additionalChecks = {}) {
+    // Validate the fetched manifest structure
+    if (!fetchedManifest || typeof fetchedManifest !== 'object') {
+        throw new Error(`Invalid manifest received for ${expectedAddon.name}`);
+    }
+    
+    // Safety check: verify the fetched manifest is for the expected addon
+    if (fetchedManifest.name !== expectedAddon.name) {
+        throw new Error(`Manifest name mismatch: expected "${expectedAddon.name}", but received manifest for "${fetchedManifest.name || 'unnamed addon'}"`);
+    }
+    
+    // Safety check: verify the addon at this index is still the same one we started with
+    const currentAddon = addons.value[currentIndex];
+    if (!currentAddon || !currentAddon.manifest || currentAddon.manifest.name !== expectedAddon.name) {
+        throw new Error(`Addon mismatch: expected "${expectedAddon.name}" at index ${currentIndex}, but found "${currentAddon?.manifest?.name || 'unknown'}"`);
+    }
+    
+    // Additional safety: verify the transportUrl hasn't changed
+    if (currentAddon.transportUrl !== expectedAddon.transportUrl) {
+        throw new Error(`Transport URL mismatch for "${expectedAddon.name}": expected "${expectedAddon.transportUrl}", but found "${currentAddon.transportUrl}"`);
+    }
+    
+    // Apply any additional custom checks
+    if (additionalChecks.transportUrlContains) {
+        if (!currentAddon.transportUrl || !currentAddon.transportUrl.includes(additionalChecks.transportUrlContains)) {
+            throw new Error(`Addon at index ${currentIndex} doesn't appear to be ${expectedAddon.name} (transportUrl: "${currentAddon.transportUrl}")`);
+        }
+    }
+    
+    return currentAddon;
+}
+
+/**
+ * Generic function to reset any addon to its original state by fetching 
+ * the unmodified manifest from its transportUrl
+ */
+function resetAddon(addonIndex) {
+    const key = stremioAuthKey.value;
+    if (!key) {
+        console.error('No auth key provided');
+        alert('Authentication required to reset addon');
+        return;
+    }
+
+    if (addonIndex < 0 || addonIndex >= addons.value.length) {
+        alert('Invalid addon index');
+        return;
+    }
+
+    const addon = addons.value[addonIndex];
+    if (!addon || !addon.manifest || !addon.transportUrl) {
+        alert('Addon not found or missing transport URL');
+        return;
+    }
+
+    const addonName = addon.manifest.name || 'Unknown Addon';
+    
+    // Store original addon details for verification later
+    const originalAddonReference = {
+        name: addonName,
+        transportUrl: addon.transportUrl,
+        index: addonIndex
+    };
+    
+    // If this is Cinemeta, use the specialized function
+    if (addonName === 'Cinemeta') {
+        resetCinemeta();
+        return;
+    }
+    
+    console.log(`Resetting ${originalAddonReference.name} to original state...`);
+    
+    // Set loading state for this specific addon
+    isResettingAddon.value = {
+        ...isResettingAddon.value,
+        [originalAddonReference.index]: true
+    };
+
+    // Normalize the transportUrl to a proper manifest.json endpoint
+    const manifestUrl = normalizeManifestUrl(addon.transportUrl);
+
+    // Fetch the original manifest
+    fetch(manifestUrl)
+        .then((response) => {
+            if (!response.ok) {
+                throw new Error(`Failed to fetch ${originalAddonReference.name} manifest: ${response.status} ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then((originalManifest) => {
+            console.log(`Fetched original ${originalAddonReference.name} manifest:`, originalManifest);
+            
+            // Use validation helper
+            const currentAddon = validateAddonResetSafety(
+                originalAddonReference, 
+                originalManifest, 
+                originalAddonReference.index
+            );
+            
+            // Preserve the original addon structure but replace the manifest
+            addons.value[originalAddonReference.index] = {
+                ...currentAddon,
+                manifest: originalManifest
+            };
+
+            console.log(`${originalAddonReference.name} addon succesfuly updated`);
+
+            // Auto-sync the updated collection to Stremio
+            return syncUserAddons();
+        })
+        .then(() => {
+            console.log(`${originalAddonReference.name} reset and sync completed successfully`);
+        })
+        .catch((error) => {
+            console.error(`Error resetting ${originalAddonReference.name}:`, error);
+            alert(`Failed to reset ${originalAddonReference.name}: ${error.message}`);
+        })
+        .finally(() => {
+            // Clear loading state for this specific addon
+            const newState = { ...isResettingAddon.value };
+            delete newState[originalAddonReference.index];
+            isResettingAddon.value = newState;
+        });
+}
+
+/**
  * Reset Cinemeta addon to its original state by fetching the unmodified manifest
  * from the official source and overwriting the current one, then syncing to Stremio
  */
@@ -714,8 +937,14 @@ function resetCinemeta() {
 
     console.log('Resetting Cinemeta to original state...');
     isResettingCinemeta.value = true;
+    
+    // Also set the individual addon resetting state for UI consistency
+    isResettingAddon.value = {
+        ...isResettingAddon.value,
+        [cinemetaIndex]: true
+    };
 
-    // Fetch the original Cinemeta manifest
+    // Fetch the original Cinemeta manifest from the official source
     fetch('https://v3-cinemeta.strem.io/manifest.json')
         .then((response) => {
             if (!response.ok) {
@@ -726,16 +955,29 @@ function resetCinemeta() {
         .then((originalManifest) => {
             console.log('Fetched original Cinemeta manifest:', originalManifest);
             
-            // Preserve the original addon structure but replace the manifest
-            const originalAddon = addons.value[cinemetaIndex];
+            // Create expected addon reference for validation
+            const cinemetaReference = {
+                name: 'Cinemeta',
+                transportUrl: addons.value[cinemetaIndex].transportUrl
+            };
+            
+            // Use validation helper with Cinemeta-specific checks
+            const currentAddon = validateAddonResetSafety(
+                cinemetaReference, 
+                originalManifest, 
+                cinemetaIndex,
+                { transportUrlContains: 'cinemeta' }
+            );
+            
+            // Preserve the current addon structure but replace the manifest
             addons.value[cinemetaIndex] = {
-                ...originalAddon,
+                ...currentAddon,
                 manifest: originalManifest
             };
 
-            console.log('Cinemeta addon updated with original manifest');
+            console.log('Cinemeta succesfuly updated');
 
-            // Reset toggles
+            // Reset Cinemeta-specific toggles
             shouldRemoveSearchArtifacts.value = false;
             shouldRemoveStandardCatalogs.value = false;
             shouldRemoveMetaResource.value = false;
@@ -744,7 +986,7 @@ function resetCinemeta() {
             return syncUserAddons();
         })
         .then(() => {
-            // Update patch detection flags after successful sync
+            // Update Cinemeta-specific patch detection flags after successful sync
             isSearchArtifactsPatched.value = false;
             isStandardCatalogsPatched.value = false;
             isMetaResourcePatched.value = false;
@@ -757,6 +999,11 @@ function resetCinemeta() {
         })
         .finally(() => {
             isResettingCinemeta.value = false;
+            
+            // Clear the individual addon resetting state
+            const newState = { ...isResettingAddon.value };
+            delete newState[cinemetaIndex];
+            isResettingAddon.value = newState;
         });
 }
  </script>
@@ -859,7 +1106,7 @@ function resetCinemeta() {
                 @click="resetCinemeta"
               >
                 <span class="spinner" v-if="isResettingCinemeta"></span>
-                <span>🔄</span>
+                <span>⟲</span>
                 <span>Reset Cinemeta</span>
               </button>
             </div>
@@ -984,8 +1231,11 @@ function resetCinemeta() {
                     :logoURL="getNestedObjectProperty(addon, 'manifest.logo', null)"
                     :isDeletable="addon.manifest?.name !== 'Cinemeta'"
                     :isConfigurable="!!(addon.transportUrl && addon.transportUrl.includes('/manifest.json'))"
+                    :isResetable="!!(addon.transportUrl && addon.transportUrl !== 'N/A')"
+                    :isResetting="!!isResettingAddon[index]"
                     @delete-addon="removeAddon"
                     @edit-manifest="openEditModal"
+                    @reset-addon="resetAddon"
                   />
                 </template>
               </draggable>
