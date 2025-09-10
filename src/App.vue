@@ -11,8 +11,8 @@ import Footer from './components/Footer.vue'
     <header class="app-header">
       <div class="container">
       </div>
-      <Header addonName="Cinebye"
-        addonSummary="Effortlessly get rid of Cinemeta, as much as you decide to." addonLogo="logo.png" />
+      <Header addonName="Cinemeta by by.."
+        addonSummary="Apague o Cinemeta facilmente, quando e como quiser." addonLogo="logo.png" />
     </header>
     <main class="app-main">
       <Configuration />
